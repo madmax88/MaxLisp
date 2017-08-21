@@ -9,6 +9,7 @@ typedef enum {
   STRING,
   CONS,
   LAMBDA,
+  MACRO,
   NATIVE_FUNCTION
 } lisp_type;
 
@@ -78,7 +79,7 @@ lisp_object_t* eval(lisp_object_t *expression, lisp_object_t *environment);
  *
  * Apply's a function (even native) to its arguments
  */
-lisp_object_t* apply(lisp_object_t *f, lisp_object_t *xargs);
+lisp_object_t* apply(lisp_object_t *f, lisp_object_t *xargs, lisp_object_t *env);
 
 /* Returns the value that symbol is bound to in environment
  * 

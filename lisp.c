@@ -7,7 +7,7 @@
 
 /* TODO: we need macros!
  * 
- * Macros are fundamentally a specialized procedure.
+ * Macros are fundamentally a specialized procedure. (or are procedures a specialized macro...?)
  * We add an additional type called `MACRO`
  * that is handled by applying the `car` of the expression to the unevaluated `cdr`
  * and evaluating the result. 
@@ -22,6 +22,8 @@ static void unmark_all_references();
 static void mark(lisp_object_t *object);
 
 static lisp_object_t* eval_arg_list(lisp_object_t *arg_list, lisp_object_t *env);
+
+static lisp_object_t* apply_lambda(lisp_object_t *lambda_expr, lisp_object_t *xargs);
 
 lisp_object_t* init_lisp_module() {
   NIL = make_cons(NULL, NULL);
@@ -275,6 +277,14 @@ lisp_object_t* print_object(lisp_object_t *object) {
     dest = strdup("NATIVE_FUNCTION");
     break;
 
+  case LAMBDA:
+    dest = strdup("LAMBDA_CLOSURE");
+    break;
+
+  case MACRO:
+    dest = strdup("META_LAMBDA_CLOSURE");
+    break;
+
   default:
     fprintf(stderr, "ERROR: print_object() not defined on given type. Panicing like a coward.\n");
     break;
@@ -352,6 +362,9 @@ void delete_object(lisp_object_t *object) {
       free(object->datum.cons);
     break;
 
+  case NATIVE_FUNCTION:
+    break;
+
   default:
     break;
   }
@@ -414,7 +427,7 @@ static lisp_object_t* eval_arg_list(lisp_object_t *arg_list, lisp_object_t *env)
 lisp_object_t* eval(lisp_object_t *expression, lisp_object_t *environment) {
   lisp_object_t *expr = NULL;
   lisp_object_t *super_env = NULL;
-  lisp_object_t *car, *cdr;
+  lisp_object_t *car;
 
   switch (expression->type) {
 
@@ -427,7 +440,9 @@ lisp_object_t* eval(lisp_object_t *expression, lisp_object_t *environment) {
     if (expr == NULL) {
       super_env = nice_get("*lisp-super-env*", environment);
 
-      if (super_env != NULL) expr = get(expression, super_env);
+      if (super_env != NULL) {
+        expr = eval(expression, super_env);
+      }
     }
 
     if (expr == NULL) {
@@ -443,14 +458,30 @@ lisp_object_t* eval(lisp_object_t *expression, lisp_object_t *environment) {
     return expression;
 
   case CONS:
-    if (expression != NIL && CONS_VALUE(expression)->car->type == SYMBOL
-        && strcmp(CONS_VALUE(expression)->car->datum.symbol, "lambda") == 0) {
+    /* handles our special cases */
+    if (expression == NIL) {
+      return NIL;
+    } else if (CONS_VALUE(expression)->car->type == SYMBOL
+               && strcmp(CONS_VALUE(expression)->car->datum.symbol, "lambda") == 0) {
       expr = make_cons(expression, environment);
       expr->type = LAMBDA;
 
       return expr;
-    } else if (expression == NIL) {
-      return NIL;
+    } else if (CONS_VALUE(expression)->car->type == SYMBOL
+               && strcmp(CONS_VALUE(expression)->car->datum.symbol, "meta-lambda") == 0) {
+      expr = make_cons(expression, environment);
+      expr->type = MACRO;
+
+      return expr;
+    } else if (CONS_VALUE(expression)->car->type == SYMBOL
+               && strcmp(CONS_VALUE(expression)->car->datum.symbol, "quote") == 0) {
+      return quote_func(CONS_VALUE(expression)->cdr);
+    } else if (CONS_VALUE(expression)->car->type == SYMBOL
+               && strcmp(CONS_VALUE(expression)->car->datum.symbol, "set") == 0) {
+      return set_func(expression, environment);
+    } else if (CONS_VALUE(expression)->car->type == SYMBOL
+               && strcmp(CONS_VALUE(expression)->car->datum.symbol, "if") == 0) {
+      return if_func(CONS_VALUE(expression)->cdr, environment);
     }
 
     car = eval(CONS_VALUE(expression)->car, environment);
@@ -458,25 +489,80 @@ lisp_object_t* eval(lisp_object_t *expression, lisp_object_t *environment) {
     if (car == NULL)
       return NULL;
 
-    cdr = eval_arg_list(CONS_VALUE(expression)->cdr, environment);
-
-    if (cdr == NULL)
-      return NULL;
-
-    return apply(car, cdr);
+    return apply(car, CONS_VALUE(expression)->cdr, environment);
 
   default:
     return NIL;
   }
 }
 
-lisp_object_t* apply(lisp_object_t *f, lisp_object_t *xargs) {
+lisp_object_t* apply(lisp_object_t *f, lisp_object_t *xargs, lisp_object_t *env) {
   if (f->type == NATIVE_FUNCTION) {
-    return f->datum.native_func(xargs);
+    lisp_object_t *cdr = eval_arg_list(xargs, env);
+
+    if (!cdr)
+      return NULL;
+
+    return f->datum.native_func(cdr);
+  } else if (f->type == LAMBDA) {
+    lisp_object_t *cdr = eval_arg_list(xargs, env);
+
+    if (!cdr)
+      return NULL;
+    
+    return apply_lambda(f, xargs);
   } else {
-    fprintf(stderr, "Error: not defined on lambda's yet.\n");
+    fprintf(stderr, "Error: not defined on this yet.\n");
     return NIL;
   }
+}
+
+static lisp_object_t* apply_lambda(lisp_object_t *lambda_expr,
+                                   lisp_object_t *xargs) {
+  lisp_object_t *lambda_object = CONS_VALUE(lambda_expr)->car;
+  lisp_object_t *lexical_env = CONS_VALUE(lambda_expr)->cdr;
+  lisp_object_t *lambda_list = NULL;
+  lisp_object_t *lambda_body = NULL;
+  lisp_object_t *lambda_env = NIL;
+
+  if (CONS_VALUE(CONS_VALUE(lambda_object)->cdr)->car->type != CONS) {
+    fprintf(stderr, "Error: lambda is missing a lambda list.\n");
+    return NULL;
+  }
+
+  lambda_list = CONS_VALUE(CONS_VALUE(lambda_object)->cdr)->car;
+  lambda_body = CONS_VALUE(CONS_VALUE(lambda_object)->cdr)->cdr;
+  lambda_env  = nice_set("*lisp-super-env*", lexical_env, lambda_env);
+
+  /* first, we create a new environment w/ variables bound properly */
+  lisp_object_t *param_nav = lambda_list;
+  lisp_object_t *arg_nav = xargs;
+  while (param_nav != NIL && arg_nav != NIL &&
+         param_nav->type == CONS && arg_nav->type == CONS) {
+    lambda_env = set(CONS_VALUE(param_nav)->car, CONS_VALUE(arg_nav)->car, lambda_env);
+
+    param_nav = CONS_VALUE(param_nav)->cdr;
+    arg_nav = CONS_VALUE(arg_nav)->cdr;
+  }
+
+  if (param_nav != NIL) {
+    fprintf(stderr, "Error: too few parameters supplied to function.\n");
+    return NULL;
+  } else if (arg_nav != NIL) {
+    fprintf(stderr, "Error: too many parameters supplied to function.\n");
+    return NULL;
+  }
+
+  lisp_object_t *lambda_it = lambda_body;
+  lisp_object_t *result = NIL;
+
+  /* iterate over the lambda body, evaluating it in-order */
+  while (lambda_it != NIL && lambda_it->type == CONS) {
+    result = eval(CONS_VALUE(lambda_it)->car, lambda_env);
+    lambda_it = CONS_VALUE(lambda_it)->cdr;
+  }
+
+  return result;
 }
 
 lisp_object_t* get(lisp_object_t *symbol, lisp_object_t *environment) {

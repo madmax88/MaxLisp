@@ -12,8 +12,9 @@ int main() {
 
   while (1) {
     do_gc(global_environment);
-    printf("Total number of objects: %ld\n", allocated_objects());
+    /* printf("Total number of objects: %ld\n", allocated_objects()); */
 
+    printf("> ");
     lisp_object_t *object = read_object(stdin);
 
     if (object == NULL)
@@ -27,7 +28,7 @@ int main() {
     lisp_object_t *pro = print_object(new_object);
 
     printf("%s\n", pro->datum.string);
-    printf("Total number of objects: %ld\n\n", allocated_objects());
+    /* printf("Total number of objects: %ld\n\n", allocated_objects()); */
 
   }
 }

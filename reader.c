@@ -70,6 +70,7 @@ static lisp_object_t* read_string() {
     target_ptr++;
     ptr++;
   }
+  *target_ptr = 0;
 
   string->type = STRING;
   string->datum.string = target_str;
@@ -88,10 +89,12 @@ static lisp_object_t* read_double() {
 
 static lisp_object_t* read_symbol() {
   lisp_object_t *symbol_o = make_lisp_object();
-  char *symbol_contents = malloc(yyleng);
+  char *symbol_contents = malloc(yyleng + 1);
 
   symbol_o->type = SYMBOL;
   strncpy(symbol_contents, yytext, yyleng);
+  symbol_contents[yyleng] = 0;
+
   symbol_o->datum.symbol = symbol_contents;
 
   return symbol_o;
