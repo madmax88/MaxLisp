@@ -72,6 +72,18 @@ lisp_object_t* make_lisp_object() {
   return object;
 }
 
+size_t allocated_objects() {
+  size_t num = 0;
+
+  reference_list_t *current_reference = references;
+  while (current_reference) {
+    num++;
+    current_reference = current_reference->next;
+  }
+
+  return num;
+}
+
 lisp_object_t* make_cons(lisp_object_t *car, lisp_object_t *cdr) {
   lisp_object_t *object = make_lisp_object();
   object->datum.cons = malloc(sizeof(cons));

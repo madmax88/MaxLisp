@@ -99,4 +99,7 @@ lisp_object_t* nice_set(char *symbol_name, lisp_object_t *v, lisp_object_t *e);
 void register_function(char *function_name, lisp_function function,
                        lisp_object_t *environment);
 
+/* returns the # of allocated objects */
+size_t allocated_objects();
+
 #endif
