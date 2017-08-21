@@ -18,40 +18,34 @@ SYMBOL     [^\t\n\r \"\'\`\;\(\)]+
 
 %%
 
-{NUMBER} { printf("I see a number\n"); return TOKEN_NUMBER;}
-
-{SYMBOL} { printf("I see a symbol\n"); return TOKEN_SYMBOL;}
-
-{QUOTE}  { // printf("I see a start quote\n"); 
-           BEGIN(string);}
-
-<string>\\{QUOTE} {
-    // printf("I see a quoted-quote!");
-    yymore();
+{NUMBER} {
+  return TOKEN_NUMBER;
 }
 
-<string>{QUOTE} {
-  //printf("I see an end-quote!\n");
-  BEGIN(0);
-  return TOKEN_QUOTE;
-};
-
-<string>.* {
-  yymore();
+{SYMBOL} {
+  return TOKEN_SYMBOL;
 }
 
 {QUOTE}([^\"]|(\\\")?)*{QUOTE} {
-    printf("I'm a string");
+  return TOKEN_QUOTE;
 }
 
-{LEFT_PAREN} { printf("I see a left parenthesis"); return TOKEN_LEFT_PAREN;}
+{LEFT_PAREN} {
+  return TOKEN_LEFT_PAREN;
+}
 
-{RIGHT_PAREN} { printf("I see a right parenthesis"); return TOKEN_RIGHT_PAREN;}
+{RIGHT_PAREN} {
+  return TOKEN_RIGHT_PAREN;
+}
+
+[ \t\n]* {
+
+}
 
 <<EOF>> { return TOKEN_EOF; }
 
 %%
 
-int main() {
-    yylex();    
+void my_savior(int c, char *text) {
+     yyunput(c, text);
 }

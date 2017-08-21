@@ -1,16 +1,23 @@
 #ifndef LISP_H
 #define LISP_H
 
+#define CONS_VALUE(x) (((cons*) x->datum.cons))
+
 typedef enum {
   SYMBOL,
   NUMBER,
   STRING,
   CONS,
-  LAMBDA
+  LAMBDA,
+  NATIVE_FUNCTION
 } lisp_type;
 
+struct lisp_object;
+struct cons_struct;
 
-typedef struct {
+typedef struct lisp_object* (*lisp_function) (struct lisp_object *param_list);
+
+struct lisp_object {
   lisp_type type;
   unsigned char marked;
 
@@ -18,11 +25,14 @@ typedef struct {
     double number;
     char *string;
     char *symbol;
-    void *cons;                 /* so we can forward reference cons */
+    struct cons_struct *cons;  /* so we can forward reference cons */
+    lisp_function native_func;
   } datum;
-} lisp_object_t;
+};
 
-typedef struct {
+typedef struct lisp_object lisp_object_t;
+
+typedef struct cons_struct {
   lisp_object_t *car;
   lisp_object_t *cdr;
 } cons;
@@ -46,7 +56,7 @@ void delete_object(lisp_object_t *object);
 lisp_object_t* make_cons(lisp_object_t *car, lisp_object_t *cdr);
 
 /* Must be called before using the lisp module */
-void init_lisp_module();
+lisp_object_t* init_lisp_module();
 
 /* Returns a deep copy of a lisp_object */
 lisp_object_t* deep_copy(lisp_object_t *src);
@@ -56,5 +66,37 @@ void do_gc(lisp_object_t *environment);
 
 /* Returns a string representing the given object */
 lisp_object_t* print_object(lisp_object_t *object);
+
+/* Core function: eval 
+ *
+ * An environment is a linked list of pairs relating symbols to values,
+ * i.e. ((foo . 10) (bar . buzz) ...)
+ */
+lisp_object_t* eval(lisp_object_t *expression, lisp_object_t *environment);
+
+/* Core function: apply
+ *
+ * Apply's a function (even native) to its arguments
+ */
+lisp_object_t* apply(lisp_object_t *f, lisp_object_t *xargs);
+
+/* Returns the value that symbol is bound to in environment
+ * 
+ * If no value is found, NULL (not NIL) is returned. 
+ */
+lisp_object_t* get(lisp_object_t *symbol, lisp_object_t *environment);
+
+lisp_object_t* nice_get(char *s, lisp_object_t *e);
+
+/* Sets a symbol to a value in the current environment
+ */
+lisp_object_t* set(lisp_object_t *s, lisp_object_t *v, lisp_object_t *e);
+
+lisp_object_t* nice_set(char *symbol_name, lisp_object_t *v, lisp_object_t *e);
+
+/* registers a function with the runtime
+ */
+void register_function(char *function_name, lisp_function function,
+                       lisp_object_t *environment);
 
 #endif
