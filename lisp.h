@@ -103,4 +103,13 @@ void register_function(char *function_name, lisp_function function,
 /* returns the # of allocated objects */
 size_t allocated_objects();
 
+/* our malloc implementation */
+void* xmalloc(size_t bytes);
+
+#ifdef __GNUC__
+
+char* strdup(const char *src);
+
+#endif
+
 #endif

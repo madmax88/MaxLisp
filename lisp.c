@@ -5,18 +5,10 @@
 #include "lisp.h"
 #include "runtime_functions.h"
 
-/* TODO: we need macros!
- * 
- * Macros are fundamentally a specialized procedure. (or are procedures a specialized macro...?)
- * We add an additional type called `MACRO`
- * that is handled by applying the `car` of the expression to the unevaluated `cdr`
- * and evaluating the result. 
- */
-
 static reference_list_t *references = NULL;
 
-lisp_object_t* NIL = NULL;
-lisp_object_t* T   = NULL;
+lisp_object_t* NIL                = NULL;
+lisp_object_t* T                  = NULL;
 
 static void unmark_all_references();
 static void mark(lisp_object_t *object);
@@ -25,10 +17,24 @@ static lisp_object_t* eval_arg_list(lisp_object_t *arg_list, lisp_object_t *env)
 
 static lisp_object_t* apply_lambda(lisp_object_t *lambda_expr, lisp_object_t *xargs);
 
+void* xmalloc(size_t bytes) {
+  char *object = malloc(bytes);
+
+  if (!object) {
+    fprintf(stderr, "Error: out of memory.\n");
+    exit(1);
+  }
+  
+  return object;
+}
+
 lisp_object_t* init_lisp_module() {
   NIL = make_cons(NULL, NULL);
 
   lisp_object_t *global_environment = NIL;
+  lisp_object_t *core_path = make_lisp_object();
+  core_path->type = STRING;
+  core_path->datum.string = strdup("core.lisp");
 
   T = make_lisp_object();
   T->type = SYMBOL;
@@ -41,12 +47,20 @@ lisp_object_t* init_lisp_module() {
   register_function("cons", cons_func, global_environment);
   register_function("car",  car_func,  global_environment);
   register_function("cdr",  cdr_func,  global_environment);
+  register_function("list", list, global_environment);
+  register_function("length", length, global_environment);
+  register_function("eq", eq, global_environment);
+  register_function("atom?", atomp, global_environment);
+  register_function("primitive-print", primitive_print, global_environment);
+
+  /* we need to load "core.lisp" as part of the bootstrap process */
+  load(make_cons(core_path, NIL), global_environment);
 
   return global_environment;
 }
 
 static reference_list_t* make_reference_list(lisp_object_t *object) {
-  reference_list_t* ref = malloc(sizeof(reference_list_t));
+  reference_list_t* ref = xmalloc(sizeof(reference_list_t));
   ref->next = NULL;
   ref->node = object;
   return ref;
@@ -66,7 +80,7 @@ static void create_reference(lisp_object_t *object) {
 }
 
 lisp_object_t* make_lisp_object() {
-  lisp_object_t *object = malloc(sizeof(lisp_object_t));
+  lisp_object_t *object = xmalloc(sizeof(lisp_object_t));
   create_reference(object);
 
   object->marked = 0;
@@ -88,7 +102,7 @@ size_t allocated_objects() {
 
 lisp_object_t* make_cons(lisp_object_t *car, lisp_object_t *cdr) {
   lisp_object_t *object = make_lisp_object();
-  object->datum.cons = malloc(sizeof(cons));
+  object->datum.cons = xmalloc(sizeof(cons));
   object->type = CONS;
 
   cons *object_cons = (cons*) object->datum.cons;
@@ -148,7 +162,7 @@ lisp_object_t* deep_copy(lisp_object_t *src) {
 
 lisp_object_t* print_object(lisp_object_t *object) {
   size_t string_size = 256;
-  char *dest = malloc(string_size);
+  char *dest = xmalloc(string_size);
   lisp_object_t *lisp_string = make_lisp_object();
   lisp_object_t *cdr;
 
@@ -382,13 +396,16 @@ static void unmark_all_references() {
 }
 
 static void mark(lisp_object_t *root) {
+  if (!root)
+    return;
+
   if (root->marked)
     return;
 
   root->marked = 1;
 
   if ((root->type == CONS &&
-       root != NIL) || root->type == LAMBDA) {
+       root != NIL) || root->type == LAMBDA || root->type == MACRO) {
     mark(((cons*) root->datum.cons)->car);
     mark(((cons*) root->datum.cons)->cdr);
   } 
@@ -396,7 +413,6 @@ static void mark(lisp_object_t *root) {
 
 static lisp_object_t* eval_arg_list(lisp_object_t *arg_list, lisp_object_t *env) {
   lisp_object_t *arg_ptr = arg_list;
-
   lisp_object_t *args_cons  = make_cons(NULL, NULL);
   lisp_object_t *to_return  = args_cons;
   lisp_object_t **prev_ref  = &args_cons;
@@ -457,6 +473,9 @@ lisp_object_t* eval(lisp_object_t *expression, lisp_object_t *environment) {
   case NATIVE_FUNCTION:
     return expression;
 
+  case LAMBDA:
+    return expression;
+
   case CONS:
     /* handles our special cases */
     if (expression == NIL) {
@@ -465,13 +484,11 @@ lisp_object_t* eval(lisp_object_t *expression, lisp_object_t *environment) {
                && strcmp(CONS_VALUE(expression)->car->datum.symbol, "lambda") == 0) {
       expr = make_cons(expression, environment);
       expr->type = LAMBDA;
-
       return expr;
     } else if (CONS_VALUE(expression)->car->type == SYMBOL
                && strcmp(CONS_VALUE(expression)->car->datum.symbol, "meta-lambda") == 0) {
       expr = make_cons(expression, environment);
       expr->type = MACRO;
-
       return expr;
     } else if (CONS_VALUE(expression)->car->type == SYMBOL
                && strcmp(CONS_VALUE(expression)->car->datum.symbol, "quote") == 0) {
@@ -482,6 +499,61 @@ lisp_object_t* eval(lisp_object_t *expression, lisp_object_t *environment) {
     } else if (CONS_VALUE(expression)->car->type == SYMBOL
                && strcmp(CONS_VALUE(expression)->car->datum.symbol, "if") == 0) {
       return if_func(CONS_VALUE(expression)->cdr, environment);
+    } else if (CONS_VALUE(expression)->car->type == SYMBOL
+               && strcmp(CONS_VALUE(expression)->car->datum.symbol, "eval") == 0) {
+      if (CONS_VALUE(expression)->cdr == NIL) {
+        fprintf(stderr, "Error: eval requires 1 argument, but received 0.\n");
+        return NULL;
+      }
+
+      return eval(eval(CONS_VALUE(CONS_VALUE(expression)->cdr)->car, environment),
+                  environment);
+    } else if (CONS_VALUE(expression)->car->type == SYMBOL
+               && strcmp(CONS_VALUE(expression)->car->datum.symbol, "load") == 0) {
+      lisp_object_t *xargs = eval_arg_list(CONS_VALUE(expression)->cdr, environment);
+      return load(xargs, environment);
+    } else if (CONS_VALUE(expression)->car->type == SYMBOL
+               && strcmp(CONS_VALUE(expression)->car->datum.symbol, "apply") == 0) {
+      if (CONS_VALUE(expression)->cdr == NIL) {
+        fprintf(stderr, "Error: apply requires 2 arguments, but received 0.\n");
+        return NULL;
+      } else if (CONS_VALUE(CONS_VALUE(expression)->cdr)->cdr == NIL) {
+        fprintf(stderr, "Error: apply requires 2 arguments, but received 1.\n");
+        return NULL;
+      }
+
+      lisp_object_t *quote_obj = make_lisp_object();
+      quote_obj->type = SYMBOL;
+      quote_obj->datum.symbol = strdup("quote");
+      
+      lisp_object_t *args = eval(CONS_VALUE(CONS_VALUE(CONS_VALUE(expression)->cdr)->cdr)->car, environment);
+
+      if (!args)
+        return NULL;
+      
+      lisp_object_t *real_args = make_cons(NULL, NULL);
+      lisp_object_t **last_ref = &real_args;
+      lisp_object_t *arg_it = args;
+      lisp_object_t *real_args_it = real_args;
+
+      while (arg_it != NIL) {
+        lisp_object_t *quoted_arg = make_cons(quote_obj,
+                                              make_cons(CONS_VALUE(arg_it)->car,
+                                                        NIL));
+        CONS_VALUE(real_args_it)->car = quoted_arg;
+        arg_it = CONS_VALUE(arg_it)->cdr;
+        last_ref = &CONS_VALUE(real_args_it)->cdr;
+        CONS_VALUE(real_args_it)->cdr = make_cons(NULL, NULL);
+        real_args_it = CONS_VALUE(real_args_it)->cdr;
+      }
+      *last_ref = NIL;
+      
+      lisp_object_t *f = eval(CONS_VALUE(CONS_VALUE(expression)->cdr)->car, environment);
+
+      if (!f)
+        return NULL;
+      
+      return apply(f, real_args, environment);
     }
 
     car = eval(CONS_VALUE(expression)->car, environment);
@@ -509,10 +581,17 @@ lisp_object_t* apply(lisp_object_t *f, lisp_object_t *xargs, lisp_object_t *env)
 
     if (!cdr)
       return NULL;
-    
-    return apply_lambda(f, xargs);
+
+    return apply_lambda(f, cdr);
+  } else if (f->type == MACRO) {
+    lisp_object_t *expansion = apply_lambda(f, xargs);
+
+    if (!expansion)
+      return NULL;
+
+    return eval(expansion, env);
   } else {
-    fprintf(stderr, "Error: not defined on this yet.\n");
+    fprintf(stderr, "Error: unknown type to apply.\n");
     return NIL;
   }
 }
@@ -545,6 +624,16 @@ static lisp_object_t* apply_lambda(lisp_object_t *lambda_expr,
     arg_nav = CONS_VALUE(arg_nav)->cdr;
   }
 
+  /* then we have a dotted list */
+  if (param_nav != NIL && param_nav->type == SYMBOL) {
+    lambda_env = set(param_nav, arg_nav, lambda_env);
+    param_nav = NIL;
+    arg_nav = NIL;
+  } else if (param_nav != NIL) {
+    fprintf(stderr, "Error: badly named function parameter.\n");
+    return NULL;
+  }
+  
   if (param_nav != NIL) {
     fprintf(stderr, "Error: too few parameters supplied to function.\n");
     return NULL;
