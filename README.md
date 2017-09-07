@@ -22,3 +22,7 @@ I'm busy, so this all may or may not happen:
 * multithreaded GC
 * profile the macro-expansion process to determine bottlenecks
 * first-class continutations
+
+# Etc
+
+Copyright Maxwell Taylor 2017. MIT License.
