@@ -27,4 +27,14 @@ lisp_object_t* primitive_print(lisp_object_t *args);
 
 lisp_object_t* add(lisp_object_t *args);
 
+lisp_object_t* subtract(lisp_object_t *args);
+
+lisp_object_t* multiply(lisp_object_t *args);
+
+lisp_object_t* divide(lisp_object_t *args);
+
+lisp_object_t* less_than(lisp_object_t *args);
+
+lisp_object_t* greater_than(lisp_object_t *args);
+
 #endif

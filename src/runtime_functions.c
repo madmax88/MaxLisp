@@ -329,7 +329,6 @@ lisp_object_t* primitive_print(lisp_object_t *args) {
   return NIL;
 }
 
-
 char* strdup(const char *src) {
   size_t len = strlen(src);
   char *copy = malloc(len + 1);
@@ -337,4 +336,190 @@ char* strdup(const char *src) {
   strcpy(copy, src);
   
   return copy;
+}
+
+lisp_object_t* add(lisp_object_t *args) {
+  int num_args = arg_length(args);
+
+  if (num_args < 1) {
+    fprintf(stderr, "Error: too few arguments supplied to +.\n");
+    return NULL;
+  }
+
+  lisp_object_t *it = args;
+  double sum = 0;
+  
+  while (it != NIL) {
+    if (CONS_VALUE(it)->car->type != NUMBER) {
+      fprintf(stderr, "Error: wrong non-numeric type given to +.\n");
+      return NULL;
+    }
+
+    sum += CONS_VALUE(it)->car->datum.number;
+    it = CONS_VALUE(it)->cdr;
+  }
+
+  lisp_object_t *result = make_lisp_object();
+  result->type = NUMBER;
+  result->datum.number = sum;
+
+  return result;
+}
+
+lisp_object_t* subtract(lisp_object_t *args) {
+  int num_args = arg_length(args);
+
+  if (num_args < 1) {
+    fprintf(stderr, "Error: too few arguments supplied to -\n");
+    return NULL;
+  }
+
+  if (CONS_VALUE(args)->car->type != NUMBER) {
+    fprintf(stderr, "Error: wrong non-numeric type given to -.\n");
+    return NULL;
+  }
+
+  double value = CONS_VALUE(args)->car->datum.number;
+  lisp_object_t *it = CONS_VALUE(args)->cdr;
+  
+  while (it != NIL) {
+    if (CONS_VALUE(it)->car->type != NUMBER) {
+      fprintf(stderr, "Error: wrong non-numeric type given to -.\n");
+      return NULL;
+    }
+
+    value -= CONS_VALUE(it)->car->datum.number;
+    it = CONS_VALUE(it)->cdr;
+  }
+
+  lisp_object_t *result = make_lisp_object();
+  result->type = NUMBER;
+  result->datum.number = value;
+
+  return result;
+}
+
+lisp_object_t* multiply(lisp_object_t *args) {
+  int num_args = arg_length(args);
+
+  if (num_args < 1) {
+    fprintf(stderr, "Error: too few arguments supplied to *.\n");
+    return NULL;
+  }
+
+  lisp_object_t *it = args;
+  double product = 1;
+  
+  while (it != NIL) {
+    if (CONS_VALUE(it)->car->type != NUMBER) {
+      fprintf(stderr, "Error: wrong non-numeric type given to *.\n");
+      return NULL;
+    }
+
+    product *= CONS_VALUE(it)->car->datum.number;
+    it = CONS_VALUE(it)->cdr;
+  }
+
+  lisp_object_t *result = make_lisp_object();
+  result->type = NUMBER;
+  result->datum.number = product;
+
+  return result;
+}
+
+lisp_object_t* divide(lisp_object_t *args) {
+  int num_args = arg_length(args);
+
+  if (num_args < 1) {
+    fprintf(stderr, "Error: too few arguments supplied to /.\n");
+    return NULL;
+  }
+
+  if (CONS_VALUE(args)->car->type != NUMBER) {
+    fprintf(stderr, "Error: wrong non-numeric type given to /.\n");
+    return NULL;
+  }
+
+  double value = CONS_VALUE(args)->car->datum.number;
+  lisp_object_t *it = CONS_VALUE(args)->cdr;
+  
+  while (it != NIL) {
+    if (CONS_VALUE(it)->car->type != NUMBER) {
+      fprintf(stderr, "Error: wrong non-numeric type given to /.\n");
+      return NULL;
+    }
+
+    value /= CONS_VALUE(it)->car->datum.number;
+    it = CONS_VALUE(it)->cdr;
+  }
+
+  lisp_object_t *result = make_lisp_object();
+  result->type = NUMBER;
+  result->datum.number = value;
+
+  return result;
+}
+
+lisp_object_t* less_than(lisp_object_t *args) {
+  int num_args = arg_length(args);
+
+  if (num_args < 1) {
+    fprintf(stderr, "Error: too few arguments supplied to <.\n");
+    return NULL;
+  }
+  
+  if (CONS_VALUE(args)->car->type != NUMBER) {
+    fprintf(stderr, "Error: wrong non-numeric type given to <.\n");
+    return NULL;
+  }
+
+  lisp_object_t *it = CONS_VALUE(args)->cdr;
+  lisp_object_t *prev = CONS_VALUE(args)->car;
+
+  while (it != NIL) {
+    if (CONS_VALUE(it)->car->type != NUMBER) {
+      fprintf(stderr, "Error: wrong non-numeric type given to <.\n");
+      return NULL;
+    }
+
+    if (CONS_VALUE(it)->car->datum.number <= prev->datum.number)
+      return NIL;
+
+    prev = CONS_VALUE(it)->car;
+    it = CONS_VALUE(it)->cdr;
+  }
+
+  return T;
+}
+
+lisp_object_t* greater_than(lisp_object_t *args) {
+  int num_args = arg_length(args);
+
+  if (num_args < 1) {
+    fprintf(stderr, "Error: too few arguments supplied to >.\n");
+    return NULL;
+  }
+  
+  if (CONS_VALUE(args)->car->type != NUMBER) {
+    fprintf(stderr, "Error: wrong non-numeric type given to >.\n");
+    return NULL;
+  }
+
+  lisp_object_t *it = CONS_VALUE(args)->cdr;
+  lisp_object_t *prev = CONS_VALUE(args)->car;
+
+  while (it != NIL) {
+    if (CONS_VALUE(it)->car->type != NUMBER) {
+      fprintf(stderr, "Error: wrong non-numeric type given to >.\n");
+      return NULL;
+    }
+
+    if (CONS_VALUE(it)->car->datum.number >= prev->datum.number)
+      return NIL;
+
+    prev = CONS_VALUE(it)->car;
+    it = CONS_VALUE(it)->cdr;
+  }
+
+  return T;
 }

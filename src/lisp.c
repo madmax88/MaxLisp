@@ -52,6 +52,12 @@ lisp_object_t* init_lisp_module() {
   register_function("eq", eq, global_environment);
   register_function("atom?", atomp, global_environment);
   register_function("primitive-print", primitive_print, global_environment);
+  register_function("+", add, global_environment);
+  register_function("-", subtract, global_environment);
+  register_function("*", multiply, global_environment);
+  register_function("/", divide, global_environment);
+  register_function("<", less_than, global_environment);
+  register_function(">", greater_than, global_environment);
 
   /* we need to load "core.lisp" as part of the bootstrap process */
   load(make_cons(core_path, NIL), global_environment);

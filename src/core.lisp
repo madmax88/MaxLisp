@@ -98,3 +98,33 @@
   (cond ((nil? seq) nil)
         ((atom? (car seq)) (cons (car seq) (flatten (cdr seq))))
         (t (append (flatten (car seq)) (flatten (cdr seq))))))
+
+(defmacro or (p . others)
+  `(if ,p
+       ,p
+       (if ,(not (nil? others))
+           (or ,@others))))
+
+(defmacro and (p . others)
+  `(if ,p
+       (if ,(not (nil? others))
+           (and ,@others)
+           ,p)))
+
+;;; WE CAN NOW USE FLATTEN, OR, and AND
+
+(defun <= (n1 . numbers)
+  (if (nil? numbers)
+      t
+      (let ((first-number (car numbers)))
+        (when (or (eq first-number n1)
+                (< n1 first-number))
+            (apply <= numbers)))))
+
+(defun >= (n1 . numbers)
+  (if (nil? numbers)
+      t
+      (let ((first-number (car numbers)))
+        (when (or (eq first-number n1)
+                (> n1 first-number))
+            (apply >= numbers)))))
