@@ -89,7 +89,14 @@
   `(if (not ,(nil? --cond-binding))
       (if ,(car --cond-binding)
           ,(cadr --cond-binding)
-          (if (not (nil? (list 'quote ,rest)))
+          (if (not ,(nil? rest))
               (cond ,@rest)))))
 
 ;;; WE CAN NOW USE WHEN, UNLESS, LET, and COND
+
+(defun flatten (seq)
+  (if (nil? seq)
+      nil
+      (if (atom? (car seq))
+          (cons (car seq) (flatten (cdr seq)))
+          (append (flatten (car seq)) (flatten (cdr seq))))))

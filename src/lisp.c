@@ -67,16 +67,10 @@ static reference_list_t* make_reference_list(lisp_object_t *object) {
 }
 
 static void create_reference(lisp_object_t *object) {
-  if (!references) {
-    references = make_reference_list(object);
-    return;
-  }
+  reference_list_t *new_reference = make_reference_list(object);
+  new_reference->next = references;
 
-  reference_list_t *current_reference = references;
-  while (current_reference->next)
-    current_reference = current_reference->next;
-
-  current_reference->next = make_reference_list(object);
+  references = new_reference;
 }
 
 lisp_object_t* make_lisp_object() {
