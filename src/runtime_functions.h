@@ -25,4 +25,6 @@ lisp_object_t* atomp(lisp_object_t *args);
 
 lisp_object_t* primitive_print(lisp_object_t *args);
 
+lisp_object_t* add(lisp_object_t *args);
+
 #endif

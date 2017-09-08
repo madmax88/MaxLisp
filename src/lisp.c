@@ -411,7 +411,7 @@ static lisp_object_t* eval_arg_list(lisp_object_t *arg_list, lisp_object_t *env)
   lisp_object_t *to_return  = args_cons;
   lisp_object_t **prev_ref  = &args_cons;
 
-  while (arg_ptr != NIL) {
+  while (arg_ptr != NIL && arg_ptr->type == CONS) {
     /* eval the args in applicative order */
     lisp_object_t *arg_value = eval(CONS_VALUE(arg_ptr)->car, env);
 
@@ -425,6 +425,11 @@ static lisp_object_t* eval_arg_list(lisp_object_t *arg_list, lisp_object_t *env)
 
     arg_ptr = CONS_VALUE(arg_ptr)->cdr;
     args_cons = CONS_VALUE(args_cons)->cdr;
+  }
+
+  if (arg_ptr->type != CONS) {
+    fprintf(stderr, "Error: improperly formatted arguments to function.\n");
+    return NULL;
   }
 
   *prev_ref = NIL;

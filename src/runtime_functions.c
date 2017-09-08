@@ -13,25 +13,33 @@ extern lisp_object_t *T;
    Currently we ignore unnecessary arguments (which is bad.)
 */
 
+static int arg_length(lisp_object_t *args) {
+  lisp_object_t *arglen = length(make_cons(args, NIL));
+
+  /* handles errors */
+  if (arglen == NULL || arglen == NIL)
+    return 0;
+
+  return (int) (arglen->datum.number);
+}
+
 lisp_object_t* quote_func(lisp_object_t *args) {
-  if (args == NIL) {
-    fprintf(stderr, "Error: quote requires 1 argument, but received 0.\n");
-    return NULL;
+  int num_args = arg_length(args);
+
+  if (num_args != 1) {
+    fprintf(stderr, "Error: quote requires 1 arguments.\n");
+    return NIL;
   }
 
   return CONS_VALUE(args)->car;
 }
 
 lisp_object_t* cons_func(lisp_object_t *args) {
-  if (args == NIL) {
-    fprintf(stderr, "Error: cons requires 2 arguments, but received 0.\n");
-    return NULL;
-  } else if (CONS_VALUE(args)->cdr == NIL) {
-    fprintf(stderr, "Error: cons requires 2 arguments, but received only 1.\n");
-    return NULL;
-  } else if (CONS_VALUE(args)->cdr->type != CONS) {
-    fprintf(stderr, "Error: cons requires a proper list.\n");
-    return NULL;
+  int num_args = arg_length(args);
+
+  if (num_args != 2) {
+    fprintf(stderr, "Error: cons requires 2 arguments.\n");
+    return NIL;
   }
 
   lisp_object_t *car = CONS_VALUE(args)->car;
@@ -41,9 +49,11 @@ lisp_object_t* cons_func(lisp_object_t *args) {
 }
 
 lisp_object_t* car_func(lisp_object_t *args) {
-  if (args == NIL) {
-    fprintf(stderr, "Error: car requires 1 argument, but received 0.\n");
-    return NULL;
+  int num_args = arg_length(args);
+
+  if (num_args != 1) {
+    fprintf(stderr, "Error: car requires 1 arguments.\n");
+    return NIL;
   }
 
   lisp_object_t *car = CONS_VALUE(args)->car;
@@ -60,9 +70,11 @@ lisp_object_t* car_func(lisp_object_t *args) {
 }
 
 lisp_object_t* cdr_func(lisp_object_t *args) {
-  if (args == NIL) {
-    fprintf(stderr, "Error: cdr requires 1 argument, but received 0.\n");
-    return NULL;
+  int num_args = arg_length(args);
+
+  if (num_args != 1) {
+    fprintf(stderr, "Error: cdr requires 1 arguments.\n");
+    return NIL;
   }
 
   lisp_object_t *car = CONS_VALUE(args)->car;
@@ -103,19 +115,16 @@ lisp_object_t* set_func(lisp_object_t *expression, lisp_object_t *environment) {
 }
 
 lisp_object_t* if_func(lisp_object_t *args, lisp_object_t *environment) {
-  if (args == NIL) {
-    fprintf(stderr, "Error: if requires at least 2 arguments, but received 0.\n");
-    return NULL;
-  } else {
-    lisp_object_t *len_list = make_cons(args, NIL);
-    lisp_object_t *len = length(len_list);
+  int num_args = arg_length(args);
 
-    if (len != NIL && len->datum.number > 3) {
-      fprintf(stderr, "Error: if accepts no more than 3 arguments.\n");
-      return NULL;
-    }
+  if (num_args < 2) {
+    fprintf(stderr, "Error: if requires at least 2 arguments.\n");
+    return NIL;
+  } else if (num_args > 3) {
+    fprintf(stderr, "Error: if accepts no more than 3 arguments.\n");
+    return NIL;
   }
-  
+
   lisp_object_t *antecedent = CONS_VALUE(args)->car;
   
   if (CONS_VALUE(args)->cdr == NIL) {
@@ -171,33 +180,6 @@ lisp_object_t* list(lisp_object_t *args) {
   return the_list;
 }
 
-lisp_object_t* apply_func(lisp_object_t *args) {
-  if (args == NIL) {
-    fprintf(stderr, "Error: apply requires 2 arguments, but received 0.\n");
-    return NULL;
-  }
-
-  lisp_object_t *func = CONS_VALUE(args)->car;
-
-  if (func->type != LAMBDA && func->type != NATIVE_FUNCTION) {
-    fprintf(stderr, "Error: apply requires its first argument to be an applicable.\n");
-    return NULL;
-  }
-
-  if (CONS_VALUE(args)->cdr == NIL) {
-    fprintf(stderr, "Error: apply requires 2 arguments, but received 1.\n");
-    return NULL;
-  }
-
-  lisp_object_t *arg_list = CONS_VALUE(CONS_VALUE(args)->cdr)->car;
-  if (arg_list->type != CONS) {
-    fprintf(stderr, "Error: the second argument to apply is not of type CONS\n");
-    return NULL;
-  }
-
-  return apply(func, arg_list, NIL);
-}
-
 lisp_object_t* length(lisp_object_t *args) {
   if (args == NIL) {
     fprintf(stderr, "Error: length requires 1 argument, but was supplied 0.\n");
@@ -210,7 +192,7 @@ lisp_object_t* length(lisp_object_t *args) {
   size_t length = 0;
 
   lisp_object_t *t = CONS_VALUE(args)->car;
-  while (t != NIL) {
+  while (t != NIL && t->type == CONS) {
     length++;
 
     t = CONS_VALUE(t)->cdr;
@@ -227,10 +209,9 @@ lisp_object_t* length(lisp_object_t *args) {
 }
 
 lisp_object_t* eq(lisp_object_t *args) {
-  lisp_object_t *len_lst = make_cons(args, NIL);
-  lisp_object_t *len = length(len_lst);
+  int num_args = arg_length(args);
 
-  if (len != NIL && len->datum.number != 2) {
+  if (num_args != 2) {
     fprintf(stderr, "Error: eq requires 2 arguments.\n");
     return NIL;
   }
@@ -271,10 +252,12 @@ lisp_object_t* eq(lisp_object_t *args) {
 }
 
 lisp_object_t* load(lisp_object_t *args, lisp_object_t *env) {
-  if (args == NIL) {
+  int num_args = arg_length(args);
+
+  if (num_args != 1) {
     fprintf(stderr, "Error: load requires 1 argument.\n");
-    return NULL;
-  }
+    return NIL;
+  } 
 
   lisp_object_t *path = CONS_VALUE(args)->car;
 
@@ -301,10 +284,12 @@ lisp_object_t* load(lisp_object_t *args, lisp_object_t *env) {
 }
 
 lisp_object_t* atomp(lisp_object_t *args) {
-  if (args == NIL) {
+  int num_args = arg_length(args);
+
+  if (num_args != 1) {
     fprintf(stderr, "Error: atom? requires 1 argument.\n");
-    return NULL;
-  }
+    return NIL;
+  } 
 
   lisp_object_t *len_lst = make_cons(args, NIL);
   lisp_object_t *len = length(len_lst);
@@ -323,12 +308,13 @@ lisp_object_t* atomp(lisp_object_t *args) {
 }
 
 lisp_object_t* primitive_print(lisp_object_t *args) {
-  lisp_object_t *len_lst = make_cons(args, NIL);
-  lisp_object_t *len = length(len_lst);
   lisp_object_t *str = NULL;
-  
-  if (len != NIL && len->datum.number != 1) {
+
+  int num_args = arg_length(args);
+
+  if (num_args != 1) {
     fprintf(stderr, "Error: primitive-print requires 1 argument.\n");
+    return NIL;
   } else {
     if (CONS_VALUE(args)->car->type == STRING) {
       str = CONS_VALUE(args)->car;
