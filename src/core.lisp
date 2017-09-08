@@ -95,8 +95,6 @@
 ;;; WE CAN NOW USE WHEN, UNLESS, LET, and COND
 
 (defun flatten (seq)
-  (if (nil? seq)
-      nil
-      (if (atom? (car seq))
-          (cons (car seq) (flatten (cdr seq)))
-          (append (flatten (car seq)) (flatten (cdr seq))))))
+  (cond ((nil? seq) nil)
+        ((atom? (car seq)) (cons (car seq) (flatten (cdr seq))))
+        (t (append (flatten (car seq)) (flatten (cdr seq))))))
