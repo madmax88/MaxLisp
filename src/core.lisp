@@ -89,7 +89,7 @@
   `(if (not ,(nil? --cond-binding))
       (if ,(car --cond-binding)
           ,(cadr --cond-binding)
-          (if ,rest
+          (if (not (nil? (list 'quote ,rest)))
               (cond ,@rest)))))
 
 ;;; WE CAN NOW USE WHEN, UNLESS, LET, and COND

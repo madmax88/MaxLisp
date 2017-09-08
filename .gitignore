@@ -1,2 +1,4 @@
 *.o
 *lisp_main
+*.DS_Store
+src/lex.yy.c
