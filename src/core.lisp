@@ -101,6 +101,19 @@
        (progn
          ,@body)))
 
+(defun repeat (datum times)
+  (if (eq times 0)
+      nil
+      (cons datum (repeat datum (- times 1)))))
+
+(defmacro letrec (--letrec-bindings . body)
+  `((lambda ,(primitive-map car --letrec-bindings)
+      ,@(primitive-map (lambda (let-form)
+                         `(setq ,(car let-form) ,(cadr let-form)))
+                       --letrec-bindings)
+      ,@body)
+    ,@(repeat nil (length --letrec-bindings))))
+
 (defmacro cond (--cond-binding . rest)
   `(if (not ,(nil? --cond-binding))
       (if ,(car --cond-binding)
@@ -144,3 +157,41 @@
         (when (or (eq first-number n1)
                 (> n1 first-number))
             (apply >= numbers)))))
+
+;;; HIGH-LEVEL FUNCTIONS
+
+(defun = (a b)
+  (cond ((and (atom? a) (atom? b)) (eq a b))
+        ((or (atom? a) (atom? b)) nil)
+        (t (list= a b))))
+
+(defun list= (list-a list-b)
+  (cond ((and (nil? list-a) (nil? list-b)) t)
+        ((or (nil? list-a) (nil? list-b)) nil)
+        ((not (= (car list-a) (car list-b))) nil)
+        (t (list= (cdr list-a) (cdr list-b)))))
+
+(defun find (needle plist)
+  (when plist
+    (if (= (car (car plist)) needle)
+        (cdr (car plist))
+        (find needle (cdr plist)))))
+
+(defun assoc (key value plist)
+  (cons (cons key value) plist))
+
+(defun memoize (f)
+  (let ((function-table '()))
+    (lambda (n . rest)
+      (let* ((arg (cons n rest))
+             (value (find arg function-table)))
+        (if value
+            value
+            (let ((function-application-result (apply f arg)))
+              (setq function-table (assoc arg function-application-result function-table))
+              function-application-result))))))
+
+(defun partial (f . initial-args)
+  (lambda (n . rest)
+    (apply f  (append initial-args
+                      (cons n rest)))))
