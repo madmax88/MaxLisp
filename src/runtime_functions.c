@@ -13,6 +13,8 @@ extern lisp_object_t *T;
    Currently we ignore unnecessary arguments (which is bad.)
 */
 
+static lisp_object_t* toplevel_environment(lisp_object_t *env);
+
 static int arg_length(lisp_object_t *args) {
   lisp_object_t *arglen = length(make_cons(args, NIL));
 
@@ -110,7 +112,7 @@ lisp_object_t* set_func(lisp_object_t *expression, lisp_object_t *environment) {
   if (!bind_value)
     return NULL;
 
-  set(symbol_value, bind_value, environment);
+  set(symbol_value, bind_value, toplevel_environment(environment));
   return NIL;
 }
 
@@ -522,4 +524,36 @@ lisp_object_t* greater_than(lisp_object_t *args) {
   }
 
   return T;
+}
+
+/* returns the toplevel environment of env */
+static lisp_object_t* toplevel_environment(lisp_object_t *env) {
+  if (!env)
+    return NULL;
+
+  lisp_object_t *toplevel = NULL;
+  lisp_object_t *env_it = env;
+
+  while (env_it != NIL && env_it->type == CONS) {
+    lisp_object_t *it_value = CONS_VALUE(env_it)->car;
+
+    if (it_value->type != CONS) {
+      fprintf(stderr, "Error: invalid object found in environment. Proceeding.\n");
+      env_it = CONS_VALUE(it_value)->cdr;
+      continue;
+    }
+
+    lisp_object_t *symbol = CONS_VALUE(it_value)->car;
+
+    if (strcmp("*lisp-super-env*", symbol->datum.symbol) == 0) {
+      toplevel = CONS_VALUE(it_value)->cdr;
+    }
+    
+    env_it = CONS_VALUE(env_it)->cdr;
+  }
+
+  if (toplevel)
+    return toplevel_environment(toplevel);
+  else
+    return env;
 }

@@ -85,6 +85,22 @@
       ,@body)
     ,@(primitive-map cadr --let-bindings)))
 
+(defmacro progn (--progn-a . --progn-rest)
+  `(cond (,(nil? --progn-a) nil)
+         (,(not (nil? --progn-rest)) ((lambda ()
+                                        ,--progn-a
+                                        (progn ,@--progn-rest))))
+         (t ((lambda ()
+               ,--progn-a)))))
+
+(defmacro let* (--let*-bindings . body)
+  `(if (not ,(nil? --let*-bindings))
+       ((lambda (,(car (car --let*-bindings)))
+          (let* ,(cdr --let*-bindings) ,@body))
+        ,(cadr (car --let*-bindings)))
+       (progn
+         ,@body)))
+
 (defmacro cond (--cond-binding . rest)
   `(if (not ,(nil? --cond-binding))
       (if ,(car --cond-binding)

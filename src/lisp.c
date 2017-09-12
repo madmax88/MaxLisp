@@ -466,7 +466,7 @@ lisp_object_t* eval(lisp_object_t *expression, lisp_object_t *environment) {
       }
     }
 
-    if (expr == NULL) {
+    if (!expr && !super_env) {
       fprintf(stderr, "Error: symbol \"%s\" not bound.\n", expression->datum.symbol);
       return NULL;
     }
@@ -700,7 +700,9 @@ lisp_object_t* set(lisp_object_t *s, lisp_object_t *v, lisp_object_t *e) {
   }
 
   if (e == NIL) {
-    return make_cons(make_cons(s, v), NIL);
+    lisp_object_t *env = make_cons(make_cons(s, v), NIL);
+    
+    return env;
   }
 
   lisp_object_t *current_node = e;
