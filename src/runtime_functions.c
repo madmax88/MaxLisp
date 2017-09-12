@@ -112,7 +112,33 @@ lisp_object_t* set_func(lisp_object_t *expression, lisp_object_t *environment) {
   if (!bind_value)
     return NULL;
 
-  set(symbol_value, bind_value, toplevel_environment(environment));
+  lisp_object_t *lex_e = environment;
+  while (lex_e) {
+    lisp_object_t *it = lex_e;
+    lisp_object_t *next = NULL;
+    char cont = 1;
+
+    while (it != NIL && it->type == CONS) {
+      if (strcmp(symbol_value->datum.symbol, CONS_VALUE(CONS_VALUE(it)->car)->car->datum.symbol) == 0) {
+        CONS_VALUE(CONS_VALUE(it)->car)->cdr = bind_value;
+        cont = 0;
+        break;
+      } else if (strcmp("*lisp-super-env*", CONS_VALUE(CONS_VALUE(it)->car)->car->datum.symbol) == 0) {
+        next = CONS_VALUE(CONS_VALUE(it)->car)->cdr;
+      }
+
+      it = CONS_VALUE(it)->cdr;
+    }
+
+    if (!next)
+      set(symbol_value, bind_value, lex_e);
+    else if (!cont)
+      break;
+    
+
+    lex_e = next;
+  }
+
   return NIL;
 }
 

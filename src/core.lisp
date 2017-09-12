@@ -108,7 +108,7 @@
           (if (not ,(nil? rest))
               (cond ,@rest)))))
 
-;;; WE CAN NOW USE WHEN, UNLESS, LET, and COND
+;;; WE CAN NOW USE WHEN, UNLESS, LETs, and COND
 
 (defun flatten (seq)
   (cond ((nil? seq) nil)
